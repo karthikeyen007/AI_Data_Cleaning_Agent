@@ -1,0 +1,1209 @@
+{% extends "base.html" %}
+
+{% block title %}ML Dashboard - AutoML Training{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<style>
+    /* Step Wizard */
+    .step-wizard {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 30px;
+        position: relative;
+    }
+    .step-wizard::before {
+        content: '';
+        position: absolute;
+        top: 20px;
+        left: 10%;
+        right: 10%;
+        height: 3px;
+        background: linear-gradient(90deg, #28a745, #17a2b8, #ffc107, #dc3545, #6f42c1);
+        z-index: 0;
+    }
+    .step {
+        text-align: center;
+        position: relative;
+        z-index: 1;
+        flex: 1;
+    }
+    .step-number {
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        background: #e9ecef;
+        color: #6c757d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 10px;
+        font-weight: bold;
+        font-size: 1.2rem;
+        border: 3px solid #dee2e6;
+        transition: all 0.3s ease;
+    }
+    .step.active .step-number {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-color: #667eea;
+        transform: scale(1.1);
+    }
+    .step.completed .step-number {
+        background: #28a745;
+        color: white;
+        border-color: #28a745;
+    }
+    .step-label { font-size: 0.85rem; color: #6c757d; }
+    .step.active .step-label { color: #667eea; font-weight: bold; }
+    .step.completed .step-label { color: #28a745; }
+
+    /* Algorithm Cards */
+    .algorithm-card {
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+        height: 100%;
+    }
+    .algorithm-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    .algorithm-card.selected {
+        border-color: #667eea;
+        background: linear-gradient(135deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%);
+    }
+    .algorithm-card .card-body { padding: 15px; }
+    .algorithm-icon { font-size: 2rem; margin-bottom: 10px; }
+
+    /* Training Overlay */
+    .training-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.85);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .training-modal {
+        background: white;
+        border-radius: 20px;
+        padding: 40px;
+        width: 90%;
+        max-width: 700px;
+        text-align: center;
+    }
+    .training-spinner {
+        width: 80px;
+        height: 80px;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .training-progress {
+        height: 35px;
+        margin: 20px 0;
+        border-radius: 20px;
+        overflow: hidden;
+        background: #e9ecef;
+    }
+    .training-progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        transition: width 0.5s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 1rem;
+    }
+    .training-stages {
+        text-align: left;
+        margin: 20px 0;
+    }
+    .training-stage {
+        padding: 10px 15px;
+        margin: 5px 0;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #f8f9fa;
+        color: #6c757d;
+    }
+    .training-stage.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        animation: pulse 1.5s infinite;
+    }
+    .training-stage.completed {
+        background: #d4edda;
+        color: #155724;
+    }
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+    .training-log {
+        background: #1a1a2e;
+        color: #00ff00;
+        font-family: 'Courier New', monospace;
+        padding: 15px;
+        border-radius: 10px;
+        max-height: 200px;
+        overflow-y: auto;
+        text-align: left;
+        font-size: 0.85rem;
+        margin-top: 20px;
+    }
+
+    /* Stats Cards */
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 25px;
+        border-radius: 15px;
+        text-align: center;
+        margin-bottom: 15px;
+    }
+    .stat-card h3 { font-size: 1.8rem; margin: 0; }
+    .stat-card p { margin: 5px 0 0; opacity: 0.9; font-size: 0.9rem; }
+
+    /* Dataset Cards */
+    .dataset-card {
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 2px solid transparent;
+        margin-bottom: 10px;
+    }
+    .dataset-card:hover { border-color: #667eea; }
+    .dataset-card.selected { border-color: #28a745; background: #d4edda; }
+
+    /* Leaderboard */
+    .leaderboard-rank-1 { background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #333; }
+    .leaderboard-rank-2 { background: linear-gradient(135deg, #C0C0C0 0%, #A0A0A0 100%); color: #333; }
+    .leaderboard-rank-3 { background: linear-gradient(135deg, #CD7F32 0%, #B87333 100%); color: white; }
+
+    /* Feature Importance */
+    .feature-bar {
+        height: 25px;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        border-radius: 5px;
+        margin-bottom: 8px;
+        transition: width 0.5s ease;
+    }
+
+    /* Select2 Custom */
+    .select2-container--bootstrap-5 .select2-selection { min-height: 45px; }
+    .select2-results__option--highlighted { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important; }
+
+    /* Suggested Target Badge */
+    .target-suggestion {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .target-suggestion:hover {
+        transform: scale(1.05);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Step Wizard -->
+        <div class="step-wizard">
+            <div class="step active" data-step="1">
+                <div class="step-number">1</div>
+                <div class="step-label">Load Data</div>
+            </div>
+            <div class="step" data-step="2">
+                <div class="step-number">2</div>
+                <div class="step-label">Select Target</div>
+            </div>
+            <div class="step" data-step="3">
+                <div class="step-number">3</div>
+                <div class="step-label">Choose Algorithm</div>
+            </div>
+            <div class="step" data-step="4">
+                <div class="step-number">4</div>
+                <div class="step-label">Train</div>
+            </div>
+            <div class="step" data-step="5">
+                <div class="step-number">5</div>
+                <div class="step-label">Results</div>
+            </div>
+        </div>
+
+        <!-- ==================== STEP 1: Load Data ==================== -->
+        <div id="step1" class="step-content">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-database"></i> Step 1: Load Training Data
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Upload New -->
+                        <div class="col-md-6">
+                            <h5><i class="fas fa-upload text-primary"></i> Upload New Dataset</h5>
+                            <div class="mb-3">
+                                <input type="file" class="form-control form-control-lg" id="dataFile" accept=".csv,.xlsx,.xls">
+                            </div>
+                            <button class="btn btn-primary btn-lg" onclick="uploadData()">
+                                <i class="fas fa-cloud-upload-alt"></i> Upload & Continue
+                            </button>
+                        </div>
+                        
+                        <!-- Select Existing -->
+                        <div class="col-md-6">
+                            <h5><i class="fas fa-folder-open text-success"></i> Or Select Existing Dataset</h5>
+                            <div id="datasetList" class="mb-3" style="max-height: 250px; overflow-y: auto;">
+                                <div class="text-muted">Loading datasets...</div>
+                            </div>
+                            <button class="btn btn-success btn-lg" onclick="loadSelectedDataset()" id="loadDatasetBtn" disabled>
+                                <i class="fas fa-check"></i> Use Selected Dataset
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Data Preview -->
+                    <div id="dataPreview" class="mt-4" style="display: none;">
+                        <hr>
+                        <h5><i class="fas fa-table"></i> Data Preview</h5>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="stat-card">
+                                    <h3 id="dataRows">0</h3>
+                                    <p>Rows</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="stat-card">
+                                    <h3 id="dataCols">0</h3>
+                                    <p>Columns</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="stat-card">
+                                    <h3 id="datasetName" style="font-size: 1rem;">-</h3>
+                                    <p>Dataset ID</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                            <table class="table table-sm table-striped" id="previewTable">
+                                <thead></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <button class="btn btn-success btn-lg mt-3" onclick="goToStep(2)">
+                            <i class="fas fa-arrow-right"></i> Continue to Target Selection
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== STEP 2: Select Target ==================== -->
+        <div id="step2" class="step-content" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-bullseye"></i> Step 2: Select Target Column
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-4">
+                                <label class="form-label fs-5">Target Column (What do you want to predict?)</label>
+                                <select class="form-select form-select-lg" id="targetSelect" style="width: 100%;">
+                                    <option value="">-- Select target column --</option>
+                                </select>
+                            </div>
+                            
+                            <!-- AI Suggestions -->
+                            <div id="targetSuggestions" class="mb-4">
+                                <h6><i class="fas fa-lightbulb text-warning"></i> AI Suggestions:</h6>
+                                <div id="suggestionList"></div>
+                            </div>
+                            
+                            <!-- Target Info -->
+                            <div id="targetInfo" class="alert alert-info" style="display: none;">
+                                <strong>Problem Type:</strong> <span id="problemType"></span><br>
+                                <strong>Unique Values:</strong> <span id="uniqueValues"></span><br>
+                                <strong>Features:</strong> <span id="featureCount"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6><i class="fas fa-info-circle"></i> Tips</h6>
+                                    <ul class="small mb-0">
+                                        <li>The target is what your model will learn to predict</li>
+                                        <li>For <strong>classification</strong>: choose categories (Yes/No, Class A/B/C)</li>
+                                        <li>For <strong>regression</strong>: choose numbers (price, salary, age)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <button class="btn btn-secondary btn-lg me-2" onclick="goToStep(1)">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </button>
+                        <button class="btn btn-success btn-lg" onclick="confirmTarget()" id="confirmTargetBtn" disabled>
+                            <i class="fas fa-arrow-right"></i> Continue to Algorithm Selection
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== STEP 3: Choose Algorithm ==================== -->
+        <div id="step3" class="step-content" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-cogs"></i> Step 3: Choose Algorithm
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-4">Select one or more algorithms to train and compare. Click to select/deselect.</p>
+                    
+                    <!-- Classification Algorithms -->
+                    <div id="classificationAlgos" style="display: none;">
+                        <h5 class="mb-3"><i class="fas fa-tags text-primary"></i> Classification Algorithms</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-3">
+                                <div class="card algorithm-card" data-algo="logistic_regression">
+                                    <div class="card-body text-center">
+                                        <div class="algorithm-icon text-primary"><i class="fas fa-chart-line"></i></div>
+                                        <h6>Logistic Regression</h6>
+                                        <small class="text-muted">Simple & interpretable</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card algorithm-card" data-algo="random_forest">
+                                    <div class="card-body text-center">
+                                        <div class="algorithm-icon text-success"><i class="fas fa-tree"></i></div>
+                                        <h6>Random Forest</h6>
+                                        <small class="text-muted">Robust & powerful</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card algorithm-card" data-algo="gradient_boosting">
+                                    <div class="card-body text-center">
+                                        <div class="algorithm-icon text-warning"><i class="fas fa-rocket"></i></div>
+                                        <h6>Gradient Boosting</h6>
+                                        <small class="text-muted">High accuracy</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card algorithm-card" data-algo="svm">
+                                    <div class="card-body text-center">
+                                        <div class="algorithm-icon text-danger"><i class="fas fa-vector-square"></i></div>
+                                        <h6>SVM</h6>
+                                        <small class="text-muted">Great for small data</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card algorithm-card" data-algo="knn">
+                                    <div class="card-body text-center">
+                                        <div class="algorithm-icon text-info"><i class="fas fa-project-diagram"></i></div>
+                                        <h6>K-Nearest Neighbors</h6>
+                                        <small class="text-muted">Instance-based</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card algorithm-card" data-algo="naive_bayes">
+                                    <div class="card-body text-center">
+                                        <div class="algorithm-icon text-secondary"><i class="fas fa-percentage"></i></div>
+                                        <h6>Naive Bayes</h6>
+                                        <small class="text-muted">Probabilistic</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card algorithm-card" data-algo="decision_tree">
+                                    <div class="card-body text-center">
+                                        <div class="algorithm-icon text-success"><i class="fas fa-sitemap"></i></div>
+                                        <h6>Decision Tree</h6>
+                                        <small class="text-muted">Explainable</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card algorithm-card" data-algo="extra_trees">
+                                    <div class="card-body text-center">
+                                        <div class="algorithm-icon text-dark"><i class="fas fa-trees"></i></div>
+                                        <h6>Extra Trees</h6>
+                                        <small class="text-muted">Ensemble method</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Regression Algorithms -->
+                    <div id="regressionAlgos" style="display: none;">
+                        <h5 class="mb-3"><i class="fas fa-chart-area text-success"></i> Regression Algorithms</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-3">
+                                <div class="card algorithm-card" data-algo="linear_regression">
+                                    <div class="card-body text-center">
+                                        <div class="algorithm-icon text-primary"><i class="fas fa-chart-line"></i></div>
+                                        <h6>Linear Regression</h6>
+                                        <small class="text-muted">Simple baseline</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card algorithm-card" data-algo="ridge">
+                                    <div class="card-body text-center">
+                                        <div class="algorithm-icon text-info"><i class="fas fa-wave-square"></i></div>
+                                        <h6>Ridge Regression</h6>
+                                        <small class="text-muted">L2 regularization</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card algorithm-card" data-algo="lasso">
+                                    <div class="card-body text-center">
+                                        <div class="algorithm-icon text-warning"><i class="fas fa-compress-alt"></i></div>
+                                        <h6>Lasso Regression</h6>
+                                        <small class="text-muted">Feature selection</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card algorithm-card" data-algo="elastic_net">
+                                    <div class="card-body text-center">
+                                        <div class="algorithm-icon text-secondary"><i class="fas fa-bezier-curve"></i></div>
+                                        <h6>Elastic Net</h6>
+                                        <small class="text-muted">L1 + L2 combined</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card algorithm-card" data-algo="random_forest_reg">
+                                    <div class="card-body text-center">
+                                        <div class="algorithm-icon text-success"><i class="fas fa-tree"></i></div>
+                                        <h6>Random Forest</h6>
+                                        <small class="text-muted">Non-linear power</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card algorithm-card" data-algo="gradient_boosting_reg">
+                                    <div class="card-body text-center">
+                                        <div class="algorithm-icon text-warning"><i class="fas fa-rocket"></i></div>
+                                        <h6>Gradient Boosting</h6>
+                                        <small class="text-muted">High performance</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card algorithm-card" data-algo="svr">
+                                    <div class="card-body text-center">
+                                        <div class="algorithm-icon text-danger"><i class="fas fa-vector-square"></i></div>
+                                        <h6>SVR</h6>
+                                        <small class="text-muted">Support Vector</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card algorithm-card" data-algo="decision_tree_reg">
+                                    <div class="card-body text-center">
+                                        <div class="algorithm-icon text-success"><i class="fas fa-sitemap"></i></div>
+                                        <h6>Decision Tree</h6>
+                                        <small class="text-muted">Explainable</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Training Options -->
+                    <div class="row mt-4">
+                        <div class="col-md-4">
+                            <label class="form-label">Cross-Validation Folds</label>
+                            <select class="form-select" id="cvFolds">
+                                <option value="3">3-fold CV (faster)</option>
+                                <option value="5" selected>5-fold CV (balanced)</option>
+                                <option value="10">10-fold CV (thorough)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Test Size</label>
+                            <select class="form-select" id="testSize">
+                                <option value="0.1">10%</option>
+                                <option value="0.2" selected>20%</option>
+                                <option value="0.3">30%</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Random State</label>
+                            <input type="number" class="form-control" id="randomState" value="42">
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <span id="selectedCount" class="text-muted me-3">0 algorithms selected</span>
+                        <button class="btn btn-secondary btn-lg me-2" onclick="goToStep(2)">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </button>
+                        <button class="btn btn-primary btn-lg" onclick="startTraining()" id="startTrainingBtn" disabled>
+                            <i class="fas fa-play"></i> Start Training
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== STEP 4: Training Progress (Overlay) ==================== -->
+        <div id="trainingOverlay" class="training-overlay" style="display: none;">
+            <div class="training-modal">
+                <div class="training-spinner"></div>
+                <h3 id="trainingTitle">Training Models...</h3>
+                <p class="text-muted" id="trainingStatus">Initializing...</p>
+                
+                <div class="training-progress">
+                    <div class="training-progress-bar" id="progressBar" style="width: 0%">0%</div>
+                </div>
+                
+                <div class="training-stages">
+                    <div class="training-stage" data-stage="preprocessing">
+                        <i class="fas fa-database"></i> Preprocessing data...
+                    </div>
+                    <div class="training-stage" data-stage="encoding">
+                        <i class="fas fa-code"></i> Encoding features...
+                    </div>
+                    <div class="training-stage" data-stage="training">
+                        <i class="fas fa-brain"></i> Training model...
+                    </div>
+                    <div class="training-stage" data-stage="validation">
+                        <i class="fas fa-check-double"></i> Cross-validation...
+                    </div>
+                    <div class="training-stage" data-stage="saving">
+                        <i class="fas fa-save"></i> Saving model...
+                    </div>
+                </div>
+                
+                <div class="training-log" id="trainingLog">[0s] Starting training pipeline...</div>
+            </div>
+        </div>
+
+        <!-- ==================== STEP 5: Results ==================== -->
+        <div id="step5" class="step-content" style="display: none;">
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-trophy"></i> Step 5: Training Complete!
+                </div>
+                <div class="card-body">
+                    <!-- Stats -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="stat-card">
+                                <h3 id="bestScore">-</h3>
+                                <p>Best CV Score</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card">
+                                <h3 id="bestAlgo">-</h3>
+                                <p>Best Algorithm</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card">
+                                <h3 id="totalTime">-</h3>
+                                <p>Total Time</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card">
+                                <h3 id="modelVersion">v001</h3>
+                                <p>Model Version</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Leaderboard -->
+                    <h5><i class="fas fa-list-ol"></i> Model Leaderboard</h5>
+                    <div class="table-responsive mb-4">
+                        <table class="table table-hover" id="leaderboardTable">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Algorithm</th>
+                                    <th>CV Score</th>
+                                    <th>Std Dev</th>
+                                    <th>Training Time</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Feature Importance -->
+                    <div id="featureImportanceSection" style="display: none;">
+                        <h5><i class="fas fa-chart-bar"></i> Feature Importance (Top 10)</h5>
+                        <div id="featureImportanceChart" class="mb-4"></div>
+                    </div>
+                    
+                    <!-- Actions -->
+                    <div class="mt-4">
+                        <a href="/inference" class="btn btn-primary btn-lg me-2">
+                            <i class="fas fa-magic"></i> Make Predictions
+                        </a>
+                        <button class="btn btn-success btn-lg me-2" onclick="exportModel()">
+                            <i class="fas fa-download"></i> Export Model
+                        </button>
+                        <button class="btn btn-outline-secondary btn-lg" onclick="resetPipeline()">
+                            <i class="fas fa-redo"></i> Train Another Model
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+const API = '/api/ml';
+let sessionId = 'session_' + Date.now();
+let selectedDatasetId = null;
+let selectedAlgorithms = [];
+let problemType = null;
+let trainingStartTime = null;
+let currentData = null;
+
+// ==================== INITIALIZATION ====================
+$(document).ready(function() {
+    // Initialize Select2 for target dropdown
+    $('#targetSelect').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Search and select target column...',
+        allowClear: true
+    }).on('change', function() {
+        $('#confirmTargetBtn').prop('disabled', !$(this).val());
+    });
+    
+    // Algorithm card click handler
+    $(document).on('click', '.algorithm-card', function() {
+        $(this).toggleClass('selected');
+        updateSelectedAlgorithms();
+    });
+    
+    // Load datasets
+    loadDatasets();
+});
+
+// ==================== STEP NAVIGATION ====================
+function goToStep(step) {
+    // Update wizard UI
+    $('.step').removeClass('active completed');
+    for (let i = 1; i < step; i++) {
+        $(`.step[data-step="${i}"]`).addClass('completed');
+    }
+    $(`.step[data-step="${step}"]`).addClass('active');
+    
+    // Show/hide content
+    $('.step-content').hide();
+    $(`#step${step}`).show();
+    
+    // Step-specific actions
+    if (step === 2) {
+        loadTargetSuggestions();
+    } else if (step === 3) {
+        showAlgorithmsForProblemType();
+    }
+}
+
+// ==================== STEP 1: LOAD DATA ====================
+function loadDatasets() {
+    $.get(`${API}/datasets`, function(data) {
+        const list = $('#datasetList');
+        list.empty();
+        
+        if (!data.datasets || data.datasets.length === 0) {
+            list.html('<div class="text-muted">No datasets available. Upload a new one.</div>');
+            return;
+        }
+        
+        data.datasets.forEach(ds => {
+            const shortId = ds.id.length > 25 ? ds.id.substring(0, 25) + '...' : ds.id;
+            list.append(`
+                <div class="card dataset-card" data-id="${ds.id}">
+                    <div class="card-body py-2 px-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${shortId}</strong><br>
+                                <small class="text-muted">${ds.rows} rows × ${ds.columns} cols</small>
+                            </div>
+                            <small class="text-muted">${ds.source || 'upload'}</small>
+                        </div>
+                    </div>
+                </div>
+            `);
+        });
+        
+        $('.dataset-card').click(function() {
+            $('.dataset-card').removeClass('selected');
+            $(this).addClass('selected');
+            selectedDatasetId = $(this).data('id');
+            $('#loadDatasetBtn').prop('disabled', false);
+        });
+    });
+}
+
+function uploadData() {
+    const fileInput = document.getElementById('dataFile');
+    if (!fileInput.files.length) {
+        showAlert('Please select a file', 'warning');
+        return;
+    }
+    
+    showLoader('Uploading and processing data...');
+    
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    formData.append('session_id', sessionId);
+    formData.append('save', 'true');
+    
+    $.ajax({
+        url: `${API}/upload`,
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            hideLoader();
+            if (response.success) {
+                currentData = response;
+                showDataPreview(response);
+                showAlert('Data uploaded successfully!', 'success');
+            } else {
+                showAlert(response.error || 'Upload failed', 'danger');
+            }
+        },
+        error: function(xhr) {
+            hideLoader();
+            showAlert('Upload error: ' + (xhr.responseJSON?.error || 'Unknown'), 'danger');
+        }
+    });
+}
+
+function loadSelectedDataset() {
+    if (!selectedDatasetId) return;
+    
+    showLoader('Loading dataset...');
+    
+    $.ajax({
+        url: `${API}/load-dataset`,
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ dataset_id: selectedDatasetId, session_id: sessionId }),
+        success: function(response) {
+            hideLoader();
+            if (response.success) {
+                currentData = response;
+                showDataPreview(response);
+                showAlert('Dataset loaded!', 'success');
+            } else {
+                showAlert(response.error || 'Load failed', 'danger');
+            }
+        },
+        error: function(xhr) {
+            hideLoader();
+            showAlert('Load error', 'danger');
+        }
+    });
+}
+
+function showDataPreview(data) {
+    $('#dataRows').text(data.rows || 0);
+    $('#dataCols').text(data.columns || 0);
+    $('#datasetName').text(data.dataset_id ? data.dataset_id.substring(0, 20) : 'Uploaded');
+    
+    // Build preview table
+    const thead = $('#previewTable thead');
+    const tbody = $('#previewTable tbody');
+    thead.empty();
+    tbody.empty();
+    
+    if (data.preview && data.preview.length > 0) {
+        const cols = Object.keys(data.preview[0]);
+        thead.append('<tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr>');
+        
+        data.preview.slice(0, 5).forEach(row => {
+            tbody.append('<tr>' + cols.map(c => `<td>${row[c] !== null ? row[c] : '-'}</td>`).join('') + '</tr>');
+        });
+    }
+    
+    $('#dataPreview').show();
+}
+
+// ==================== STEP 2: SELECT TARGET ====================
+function loadTargetSuggestions() {
+    $.get(`${API}/suggest-targets?session_id=${sessionId}`, function(data) {
+        // Populate select dropdown
+        const select = $('#targetSelect');
+        select.empty().append('<option value="">-- Select target column --</option>');
+        
+        if (data.all_columns) {
+            data.all_columns.forEach(col => {
+                const label = col.is_suggested ? `★ ${col.name} (${col.reason})` : col.name;
+                select.append(`<option value="${col.name}">${label}</option>`);
+            });
+        }
+        select.trigger('change');
+        
+        // Show suggestion badges
+        const suggList = $('#suggestionList');
+        suggList.empty();
+        
+        if (data.suggestions && data.suggestions.length > 0) {
+            data.suggestions.forEach(s => {
+                suggList.append(`
+                    <span class="badge bg-warning text-dark me-2 mb-2 target-suggestion" 
+                          onclick="$('#targetSelect').val('${s.name}').trigger('change')">
+                        ${s.name} - ${s.reason}
+                    </span>
+                `);
+            });
+        } else {
+            suggList.html('<span class="text-muted">No clear suggestions. Please select manually.</span>');
+        }
+    }).fail(function() {
+        // If suggestions fail, just populate with column names from data preview
+        if (currentData && currentData.column_names) {
+            const select = $('#targetSelect');
+            select.empty().append('<option value="">-- Select target column --</option>');
+            currentData.column_names.forEach(col => {
+                select.append(`<option value="${col}">${col}</option>`);
+            });
+            select.trigger('change');
+        }
+    });
+}
+
+function confirmTarget() {
+    const target = $('#targetSelect').val();
+    if (!target) {
+        showAlert('Please select a target column', 'warning');
+        return;
+    }
+    
+    showLoader('Analyzing target column...');
+    
+    $.ajax({
+        url: `${API}/select-target`,
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ target_column: target, session_id: sessionId }),
+        success: function(response) {
+            hideLoader();
+            if (response.success) {
+                problemType = response.problem_type;
+                $('#problemType').text(response.problem_type.toUpperCase());
+                $('#uniqueValues').text(response.unique_values);
+                $('#featureCount').text(response.feature_count);
+                $('#targetInfo').show();
+                
+                goToStep(3);
+            } else {
+                showAlert(response.error || 'Error analyzing target', 'danger');
+            }
+        },
+        error: function(xhr) {
+            hideLoader();
+            showAlert('Error selecting target', 'danger');
+        }
+    });
+}
+
+// ==================== STEP 3: CHOOSE ALGORITHM ====================
+function showAlgorithmsForProblemType() {
+    if (problemType === 'classification') {
+        $('#classificationAlgos').show();
+        $('#regressionAlgos').hide();
+    } else {
+        $('#classificationAlgos').hide();
+        $('#regressionAlgos').show();
+    }
+    
+    // Reset selections
+    selectedAlgorithms = [];
+    $('.algorithm-card').removeClass('selected');
+    updateSelectedAlgorithms();
+}
+
+function updateSelectedAlgorithms() {
+    selectedAlgorithms = [];
+    $('.algorithm-card.selected:visible').each(function() {
+        selectedAlgorithms.push($(this).data('algo'));
+    });
+    
+    const count = selectedAlgorithms.length;
+    $('#selectedCount').text(`${count} algorithm${count !== 1 ? 's' : ''} selected`);
+    $('#startTrainingBtn').prop('disabled', count === 0);
+}
+
+// ==================== STEP 4: TRAINING ====================
+function startTraining() {
+    if (selectedAlgorithms.length === 0) {
+        showAlert('Please select at least one algorithm', 'warning');
+        return;
+    }
+    
+    // Show training overlay
+    trainingStartTime = Date.now();
+    $('#trainingOverlay').fadeIn();
+    resetTrainingUI();
+    
+    // Train algorithms sequentially
+    const allResults = [];
+    let currentIndex = 0;
+    
+    function trainNextAlgorithm() {
+        if (currentIndex >= selectedAlgorithms.length) {
+            finishTraining(allResults);
+            return;
+        }
+        
+        const algo = selectedAlgorithms[currentIndex];
+        const progress = Math.round(20 + (currentIndex / selectedAlgorithms.length) * 70);
+        
+        updateProgress(progress);
+        setStage('training');
+        $('#trainingStatus').text(`Training ${algo} (${currentIndex + 1}/${selectedAlgorithms.length})`);
+        addLog(`Training ${algo}...`);
+        
+        $.ajax({
+            url: `${API}/train`,
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                algorithm: algo,
+                cv_folds: parseInt($('#cvFolds').val()),
+                test_size: parseFloat($('#testSize').val()),
+                random_state: parseInt($('#randomState').val()),
+                session_id: sessionId,
+                auto_save: true
+            }),
+            timeout: 300000,
+            success: function(response) {
+                if (response.success) {
+                    addLog(`✓ ${algo}: CV=${response.cv_mean.toFixed(4)} (±${response.cv_std.toFixed(4)}) - ${response.training_time.toFixed(1)}s`);
+                    allResults.push(response);
+                } else {
+                    addLog(`✗ ${algo}: ${response.error}`);
+                }
+                currentIndex++;
+                trainNextAlgorithm();
+            },
+            error: function(xhr) {
+                const errMsg = xhr.responseJSON?.error || xhr.statusText || 'Unknown error';
+                addLog(`✗ ${algo}: ${errMsg}`);
+                console.error(`Training ${algo} failed:`, errMsg, xhr.responseJSON?.traceback || '');
+                currentIndex++;
+                trainNextAlgorithm();
+            }
+        });
+    }
+    
+    // Start with preprocessing stages
+    setStage('preprocessing');
+    setTimeout(() => {
+        setStage('encoding');
+        setTimeout(() => {
+            trainNextAlgorithm();
+        }, 500);
+    }, 500);
+}
+
+function resetTrainingUI() {
+    $('#progressBar').css('width', '0%').text('0%');
+    $('#trainingLog').html('[0s] Starting training pipeline...');
+    $('.training-stage').removeClass('active completed');
+    $('#trainingTitle').text('Training Models...');
+}
+
+function setStage(stage) {
+    $('.training-stage').removeClass('active');
+    $(`.training-stage[data-stage="${stage}"]`).addClass('active');
+    $(`.training-stage[data-stage="${stage}"]`).prevAll('.training-stage').addClass('completed');
+}
+
+function updateProgress(pct) {
+    $('#progressBar').css('width', pct + '%').text(Math.round(pct) + '%');
+}
+
+function addLog(message) {
+    const elapsed = ((Date.now() - trainingStartTime) / 1000).toFixed(1);
+    $('#trainingLog').append(`\n[${elapsed}s] ${message}`);
+    const log = document.getElementById('trainingLog');
+    log.scrollTop = log.scrollHeight;
+}
+
+function finishTraining(results) {
+    setStage('saving');
+    updateProgress(100);
+    
+    if (results.length === 0) {
+        addLog('ERROR: All training attempts failed! Check the logs above.');
+        setTimeout(() => {
+            $('#trainingOverlay').fadeOut();
+            // Show error with detail from training log
+            const logText = $('#trainingLog').text();
+            const lastError = logText.match(/✗.*$/m);
+            const errorDetail = lastError ? lastError[0] : 'Unknown error';
+            showAlert(`Training failed: ${errorDetail}. Check your data and try again.`, 'danger');
+            goToStep(3); // Go back to algorithm selection, not to empty results
+        }, 800);
+        return;
+    }
+    
+    addLog(`Training complete! ${results.length} model(s) trained successfully.`);
+    
+    setTimeout(() => {
+        $('#trainingOverlay').fadeOut();
+        displayResults(results);
+        goToStep(5);
+    }, 800);
+}
+
+// ==================== STEP 5: RESULTS ====================
+function displayResults(results) {
+    if (results.length === 0) {
+        return;
+    }
+    
+    // Sort by CV score (descending)
+    results.sort((a, b) => b.cv_mean - a.cv_mean);
+    const best = results[0];
+    
+    // Update stats
+    $('#bestScore').text(best.cv_mean.toFixed(4));
+    $('#bestAlgo').text(best.algorithm);
+    $('#totalTime').text(((Date.now() - trainingStartTime) / 1000).toFixed(1) + 's');
+    $('#modelVersion').text(best.version?.version || 'v001');
+    
+    // Populate leaderboard
+    const tbody = $('#leaderboardTable tbody');
+    tbody.empty();
+    
+    results.forEach((model, i) => {
+        const rankClass = i < 3 ? `leaderboard-rank-${i + 1}` : '';
+        tbody.append(`
+            <tr>
+                <td><span class="badge ${rankClass}" style="min-width: 30px;">${i + 1}</span></td>
+                <td>${model.algorithm}</td>
+                <td><strong>${model.cv_mean.toFixed(4)}</strong></td>
+                <td>±${model.cv_std.toFixed(4)}</td>
+                <td>${model.training_time.toFixed(1)}s</td>
+            </tr>
+        `);
+    });
+    
+    // Show feature importance if available
+    if (best.feature_importances && Object.keys(best.feature_importances).length > 0) {
+        showFeatureImportance(best.feature_importances);
+    } else {
+        $('#featureImportanceSection').hide();
+    }
+}
+
+function showFeatureImportance(importances) {
+    const sorted = Object.entries(importances).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    if (sorted.length === 0) {
+        $('#featureImportanceSection').hide();
+        return;
+    }
+    
+    const maxVal = sorted[0][1];
+    let html = '';
+    
+    sorted.forEach(([feature, value]) => {
+        const pct = maxVal > 0 ? (value / maxVal * 100) : 0;
+        html += `
+            <div class="mb-2">
+                <div class="d-flex justify-content-between mb-1">
+                    <span>${feature}</span>
+                    <span>${(value * 100).toFixed(2)}%</span>
+                </div>
+                <div class="feature-bar" style="width: ${pct}%"></div>
+            </div>
+        `;
+    });
+    
+    $('#featureImportanceChart').html(html);
+    $('#featureImportanceSection').show();
+}
+
+// ==================== ACTIONS ====================
+function exportModel() {
+    showLoader('Exporting model...');
+    
+    $.ajax({
+        url: `${API}/export`,
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ session_id: sessionId }),
+        xhrFields: { responseType: 'blob' },
+        success: function(blob) {
+            hideLoader();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'model_pipeline.pkl';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            showAlert('Model exported successfully!', 'success');
+        },
+        error: function() {
+            hideLoader();
+            showAlert('Export failed', 'danger');
+        }
+    });
+}
+
+function resetPipeline() {
+    if (!confirm('Are you sure you want to start over? This will clear the current session.')) return;
+    
+    sessionId = 'session_' + Date.now();
+    selectedAlgorithms = [];
+    selectedDatasetId = null;
+    currentData = null;
+    problemType = null;
+    
+    $('.algorithm-card').removeClass('selected');
+    $('#targetSelect').val('').trigger('change');
+    $('#dataPreview').hide();
+    $('#targetInfo').hide();
+    
+    goToStep(1);
+    loadDatasets();
+}
+</script>
+{% endblock %}

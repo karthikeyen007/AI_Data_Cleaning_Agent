@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+
+{% block title %}Observability & Monitoring{% endblock %}
+
+{% block extra_css %}
+<style>
+    .metric-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .metric-card h2 {
+        font-size: 2.5rem;
+        margin: 0;
+    }
+    .metric-card p {
+        margin: 0;
+        opacity: 0.9;
+    }
+    .log-container {
+        background: #1a1a2e;
+        color: #0f0;
+        font-family: 'Courier New', monospace;
+        padding: 15px;
+        border-radius: 10px;
+        height: 400px;
+        overflow-y: auto;
+    }
+    .log-entry {
+        margin-bottom: 5px;
+        font-size: 0.85rem;
+    }
+    .log-entry.error { color: #ff6b6b; }
+    .log-entry.warning { color: #feca57; }
+    .log-entry.info { color: #54a0ff; }
+    .health-indicator {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 10px;
+    }
+    .health-green { background: #27ae60; }
+    .health-yellow { background: #f39c12; }
+    .health-red { background: #e74c3c; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-area"></i> System Observability Dashboard
+            </div>
+            <div class="card-body">
+                <!-- System Health -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <h2 id="systemStatus">-</h2>
+                            <p>System Status</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <h2 id="apiLatency">-</h2>
+                            <p>Avg API Latency</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <h2 id="requestCount">0</h2>
+                            <p>Requests Today</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <h2 id="errorRate">0%</h2>
+                            <p>Error Rate</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Service Health -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <i class="fas fa-heartbeat"></i> Service Health
+                            </div>
+                            <div class="card-body">
+                                <table class="table" id="serviceHealthTable">
+                                    <tbody>
+                                        <tr>
+                                            <td><span class="health-indicator health-green"></span> FastAPI Backend</td>
+                                            <td id="backendStatus">Checking...</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="health-indicator health-green"></span> Flask Frontend</td>
+                                            <td id="frontendStatus">Running</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="health-indicator" id="aiIndicator"></span> AI Service (Euri)</td>
+                                            <td id="aiStatus">Checking...</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="health-indicator" id="dbIndicator"></span> Database Connection</td>
+                                            <td id="dbStatus">Checking...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <i class="fas fa-key"></i> API Key Status
+                            </div>
+                            <div class="card-body">
+                                <table class="table" id="keyStatusTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Source Type</th>
+                                            <th>Key</th>
+                                            <th>Model</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Cost Tracking -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <i class="fas fa-dollar-sign"></i> Cost Governance
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-6">
+                                        <h5>API Calls Today</h5>
+                                        <p class="fs-3 fw-bold text-primary" id="apiCallsToday">0</p>
+                                    </div>
+                                    <div class="col-6">
+                                        <h5>Est. Token Usage</h5>
+                                        <p class="fs-3 fw-bold text-warning" id="tokenUsage">0</p>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <h5>Budget Limit</h5>
+                                        <p class="fs-4" id="budgetLimit">$10.00 / day</p>
+                                    </div>
+                                    <div class="col-6">
+                                        <h5>Est. Cost Today</h5>
+                                        <p class="fs-4 fw-bold text-success" id="costToday">$0.00</p>
+                                    </div>
+                                </div>
+                                <div class="progress mt-3" style="height: 25px;">
+                                    <div class="progress-bar bg-success" id="costProgressBar" style="width: 0%">0%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <i class="fas fa-chart-bar"></i> Drift Detection
+                            </div>
+                            <div class="card-body">
+                                <div id="driftStatus" class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i> No drift analysis available. Run inference to collect data.
+                                </div>
+                                <button class="btn btn-outline-primary" onclick="runDriftAnalysis()">
+                                    <i class="fas fa-search"></i> Run Drift Analysis
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Logs -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span><i class="fas fa-terminal"></i> System Logs</span>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-light" onclick="refreshLogs()">
+                                        <i class="fas fa-sync"></i> Refresh
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-light" onclick="clearLogs()">
+                                        <i class="fas fa-trash"></i> Clear
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="log-container" id="logContainer">
+                                    <div class="log-entry info">[System] Observability dashboard loaded</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const API_BASE = '/api/ml';
+    let logRefreshInterval = null;
+    
+    $(document).ready(function() {
+        checkSystemHealth();
+        loadKeyStatus();
+        loadCostMetrics();
+        
+        // Auto-refresh every 30s
+        setInterval(checkSystemHealth, 30000);
+    });
+    
+    function checkSystemHealth() {
+        // Backend health
+        $.get('/api/health', function(data) {
+            $('#backendStatus').text(data.fastapi_backend === 'healthy' ? 'Healthy' : 'Unavailable');
+            $('#systemStatus').text(data.status === 'ok' ? 'OK' : 'Degraded');
+            
+            if (data.status === 'ok') {
+                addLog('info', 'Health check passed');
+            } else {
+                addLog('warning', 'System degraded');
+            }
+        }).fail(function() {
+            $('#backendStatus').text('Error');
+            $('#systemStatus').text('Error');
+            addLog('error', 'Health check failed');
+        });
+        
+        // AI Service health
+        $.get(`${API_BASE}/ai-health`, function(data) {
+            if (data.healthy) {
+                $('#aiStatus').text('Connected');
+                $('#aiIndicator').addClass('health-green').removeClass('health-red health-yellow');
+            } else {
+                $('#aiStatus').text('Disconnected');
+                $('#aiIndicator').addClass('health-red').removeClass('health-green health-yellow');
+            }
+        }).fail(function() {
+            $('#aiStatus').text('Unknown');
+            $('#aiIndicator').addClass('health-yellow').removeClass('health-green health-red');
+        });
+    }
+    
+    function loadKeyStatus() {
+        $.get(`${API_BASE}/key-status`, function(data) {
+            const tbody = $('#keyStatusTable tbody');
+            tbody.empty();
+            
+            if (data.keys) {
+                data.keys.forEach(key => {
+                    const statusBadge = key.valid 
+                        ? '<span class="badge bg-success">Valid</span>' 
+                        : '<span class="badge bg-danger">Invalid</span>';
+                    tbody.append(`
+                        <tr>
+                            <td>${key.source}</td>
+                            <td><code>${key.masked_key}</code></td>
+                            <td>${key.model}</td>
+                            <td>${statusBadge}</td>
+                        </tr>
+                    `);
+                });
+            }
+        });
+    }
+    
+    function loadCostMetrics() {
+        $.get(`${API_BASE}/cost-metrics`, function(data) {
+            $('#apiCallsToday').text(data.api_calls || 0);
+            $('#tokenUsage').text((data.tokens || 0).toLocaleString());
+            $('#costToday').text('$' + (data.estimated_cost || 0).toFixed(2));
+            
+            const budgetPct = Math.min(((data.estimated_cost || 0) / 10) * 100, 100);
+            $('#costProgressBar').css('width', budgetPct + '%').text(budgetPct.toFixed(0) + '%');
+            
+            if (budgetPct > 80) {
+                $('#costProgressBar').removeClass('bg-success bg-warning').addClass('bg-danger');
+            } else if (budgetPct > 50) {
+                $('#costProgressBar').removeClass('bg-success bg-danger').addClass('bg-warning');
+            }
+        }).fail(function() {
+            // Default values
+            $('#apiCallsToday').text('N/A');
+        });
+    }
+    
+    function runDriftAnalysis() {
+        showLoader();
+        $.post(`${API_BASE}/drift-analysis`, function(data) {
+            hideLoader();
+            if (data.drift_detected) {
+                $('#driftStatus').removeClass('alert-info alert-success').addClass('alert-warning')
+                    .html(`<i class="fas fa-exclamation-triangle"></i> <strong>Drift Detected!</strong><br>
+                           Features with drift: ${data.drifted_features.join(', ')}<br>
+                           Recommendation: Consider retraining the model.`);
+            } else {
+                $('#driftStatus').removeClass('alert-info alert-warning').addClass('alert-success')
+                    .html('<i class="fas fa-check-circle"></i> No significant drift detected. Model is stable.');
+            }
+            addLog('info', 'Drift analysis completed');
+        }).fail(function() {
+            hideLoader();
+            showAlert('Drift analysis failed', 'danger');
+        });
+    }
+    
+    function addLog(level, message) {
+        const timestamp = new Date().toLocaleTimeString();
+        const entry = `<div class="log-entry ${level}">[${timestamp}] ${message}</div>`;
+        $('#logContainer').append(entry);
+        $('#logContainer').scrollTop($('#logContainer')[0].scrollHeight);
+    }
+    
+    function refreshLogs() {
+        addLog('info', 'Logs refreshed');
+    }
+    
+    function clearLogs() {
+        $('#logContainer').html('<div class="log-entry info">[System] Logs cleared</div>');
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Upload File - AI Data Cleaning{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-file-upload"></i> Upload CSV/Excel File for Cleaning
+            </div>
+            <div class="card-body">
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="mb-4">
+                        <label for="fileInput" class="form-label fs-5">Select File</label>
+                        <input class="form-control form-control-lg" type="file" id="fileInput" 
+                               accept=".csv,.xlsx,.xls" required>
+                        <div class="form-text">Supported formats: CSV, XLSX, XLS (Max 16MB)</div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-magic"></i> Clean Data with AI
+                    </button>
+                    <a href="/" class="btn btn-secondary btn-lg ms-2">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </a>
+                </form>
+            </div>
+        </div>
+
+        <!-- Raw Data Preview -->
+        <div id="rawDataSection" class="card mt-4" style="display: none;">
+            <div class="card-header bg-secondary text-white">
+                <i class="fas fa-eye"></i> Raw Data Preview
+            </div>
+            <div class="card-body">
+                <div class="stats-card mb-3">
+                    <h3 id="rawRows">0</h3>
+                    <p>Rows × <span id="rawCols">0</span> Columns</p>
+                </div>
+                <div id="rawDataTable"></div>
+            </div>
+        </div>
+
+        <!-- Cleaned Data Results -->
+        <div id="cleanedDataSection" class="card mt-4" style="display: none;">
+            <div class="card-header">
+                <i class="fas fa-check-circle"></i> AI-Cleaned Data
+            </div>
+            <div class="card-body">
+                <div class="stats-card mb-3">
+                    <h3 id="cleanedRows">0</h3>
+                    <p>Rows × <span id="cleanedCols">0</span> Columns</p>
+                </div>
+                
+                <div class="mb-3">
+                    <button class="btn btn-success" onclick="downloadCleanedData()">
+                        <i class="fas fa-download"></i> Download Cleaned CSV
+                    </button>
+                </div>
+                
+                <div id="cleanedDataTable"></div>
+                
+                <!-- Train Model Prompt -->
+                <div id="trainPrompt" class="alert alert-info mt-4" style="display: none;">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h5><i class="fas fa-brain"></i> Ready to Train a Model?</h5>
+                            <p class="mb-0">Your cleaned dataset has been saved. You can now train machine learning models on this data.</p>
+                            <small class="text-muted">Dataset ID: <strong id="savedDatasetId">-</strong></small>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <a href="/ml_dashboard" class="btn btn-primary btn-lg" id="trainModelBtn">
+                                <i class="fas fa-rocket"></i> Train Model
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let cleanedDataGlobal = [];
+
+    $('#uploadForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const fileInput = document.getElementById('fileInput');
+        const file = fileInput.files[0];
+        
+        if (!file) {
+            showAlert('Please select a file', 'warning');
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        showLoader();
+        $('#rawDataSection, #cleanedDataSection').hide();
+        
+        $.ajax({
+            url: '/api/clean-file',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                hideLoader();
+                
+                if (response.success) {
+                    showAlert(response.message, 'success');
+                    
+                    // Display raw data
+                    $('#rawRows').text(response.raw_shape[0]);
+                    $('#rawCols').text(response.raw_shape[1]);
+                    $('#rawDataTable').html(renderDataTable(response.raw_data.slice(0, 10)));
+                    $('#rawDataSection').show();
+                    
+                    // Display cleaned data
+                    cleanedDataGlobal = response.cleaned_data;
+                    $('#cleanedRows').text(response.cleaned_shape[0]);
+                    $('#cleanedCols').text(response.cleaned_shape[1]);
+                    $('#cleanedDataTable').html(renderDataTable(response.cleaned_data.slice(0, 10)));
+                    $('#cleanedDataSection').show();
+                    
+                    // Show training prompt if dataset was saved
+                    if (response.can_train && response.dataset_id) {
+                        $('#savedDatasetId').text(response.dataset_id);
+                        $('#trainPrompt').show();
+                    }
+                    
+                    // Scroll to results
+                    $('html, body').animate({
+                        scrollTop: $('#rawDataSection').offset().top - 100
+                    }, 500);
+                } else {
+                    showAlert(response.error || 'Failed to clean data', 'danger');
+                }
+            },
+            error: function(xhr) {
+                hideLoader();
+                const error = xhr.responseJSON?.error || 'An error occurred while processing the file';
+                showAlert(error, 'danger');
+            }
+        });
+    });
+
+    function downloadCleanedData() {
+        if (cleanedDataGlobal.length === 0) {
+            showAlert('No data available to download', 'warning');
+            return;
+        }
+        downloadCSV(cleanedDataGlobal, 'cleaned_data.csv');
+    }
+</script>
+{% endblock %}

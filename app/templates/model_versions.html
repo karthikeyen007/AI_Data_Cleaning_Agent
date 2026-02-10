@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+
+{% block title %}Model Versions - MLOps{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-history"></i> Model Version Management
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label">Project ID</label>
+                        <input type="text" class="form-control" id="projectId" value="default_project">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button class="btn btn-primary" onclick="loadVersions()">
+                            <i class="fas fa-sync"></i> Load Versions
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover" id="versionsTable">
+                        <thead>
+                            <tr>
+                                <th>Version</th>
+                                <th>Algorithm</th>
+                                <th>CV Score</th>
+                                <th>Created At</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">
+                                    Click "Load Versions" to view saved models
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Save New Version -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="fas fa-save"></i> Save Current Model
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <label class="form-label">Project ID</label>
+                        <input type="text" class="form-control" id="saveProjectId" value="default_project">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Model Name</label>
+                        <input type="text" class="form-control" id="modelNameInput" placeholder="my_model">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button class="btn btn-success btn-lg" onclick="saveModel()">
+                            <i class="fas fa-cloud-upload-alt"></i> Save Model
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Retrain Section -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="fas fa-redo"></i> Retrain Model
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Upload New Training Data</h5>
+                        <p class="text-muted">Retrain an existing model with new data</p>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Select Model Version</label>
+                            <select class="form-select" id="retrainVersion">
+                                <option value="">-- Select Version --</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">New Training Data (CSV)</label>
+                            <input type="file" class="form-control" id="retrainFile" accept=".csv">
+                        </div>
+                        
+                        <button class="btn btn-warning btn-lg" onclick="retrainModel()">
+                            <i class="fas fa-sync-alt"></i> Retrain Model
+                        </button>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="alert alert-info">
+                            <h6><i class="fas fa-info-circle"></i> Retraining Notes</h6>
+                            <ul class="mb-0">
+                                <li>New data must have the same schema as original</li>
+                                <li>A new version will be created automatically</li>
+                                <li>Previous versions are preserved for rollback</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const API_BASE = '/api/ml';
+    let sessionId = localStorage.getItem('ml_session_id') || 'session_' + Date.now();
+    let versionsData = [];
+    
+    function loadVersions() {
+        const projectId = $('#projectId').val();
+        showLoader();
+        
+        $.get(`${API_BASE}/versions?project_id=${projectId}`, function(data) {
+            hideLoader();
+            versionsData = data.versions || [];
+            renderVersionsTable(versionsData);
+            populateRetrainDropdown(versionsData);
+        }).fail(function() {
+            hideLoader();
+            showAlert('Failed to load versions', 'danger');
+        });
+    }
+    
+    function renderVersionsTable(versions) {
+        const tbody = $('#versionsTable tbody');
+        tbody.empty();
+        
+        if (versions.length === 0) {
+            tbody.append('<tr><td colspan="6" class="text-center text-muted">No versions found</td></tr>');
+            return;
+        }
+        
+        versions.forEach((v, index) => {
+            const statusBadge = v.is_active 
+                ? '<span class="badge bg-success">Active</span>' 
+                : '<span class="badge bg-secondary">Archived</span>';
+            
+            tbody.append(`
+                <tr>
+                    <td><strong>v${v.version}</strong></td>
+                    <td>${v.algorithm || '-'}</td>
+                    <td>${v.cv_score ? v.cv_score.toFixed(4) : '-'}</td>
+                    <td>${v.created_at || '-'}</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="rollbackTo('${v.version}')">
+                            <i class="fas fa-undo"></i> Rollback
+                        </button>
+                        <button class="btn btn-sm btn-outline-success" onclick="exportVersion('${v.version}')">
+                            <i class="fas fa-download"></i> Export
+                        </button>
+                    </td>
+                </tr>
+            `);
+        });
+    }
+    
+    function populateRetrainDropdown(versions) {
+        const select = $('#retrainVersion');
+        select.empty().append('<option value="">-- Select Version --</option>');
+        versions.forEach(v => {
+            select.append(`<option value="${v.version}">v${v.version} - ${v.algorithm}</option>`);
+        });
+    }
+    
+    function saveModel() {
+        const projectId = $('#saveProjectId').val();
+        const modelName = $('#modelNameInput').val();
+        
+        if (!modelName) {
+            showAlert('Please enter a model name', 'warning');
+            return;
+        }
+        
+        showLoader();
+        $.ajax({
+            url: `${API_BASE}/save-model`,
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                project_id: projectId,
+                model_name: modelName,
+                session_id: sessionId
+            }),
+            success: function(response) {
+                hideLoader();
+                if (response.success) {
+                    showAlert(`Model saved as version ${response.version}`, 'success');
+                    loadVersions();
+                } else {
+                    showAlert(response.error || 'Save failed', 'danger');
+                }
+            },
+            error: function(xhr) {
+                hideLoader();
+                showAlert('Save error: ' + (xhr.responseJSON?.error || 'Unknown'), 'danger');
+            }
+        });
+    }
+    
+    function rollbackTo(version) {
+        if (!confirm(`Rollback to version ${version}? This will make it the active model.`)) {
+            return;
+        }
+        
+        const projectId = $('#projectId').val();
+        showLoader();
+        
+        $.ajax({
+            url: `${API_BASE}/rollback`,
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                project_id: projectId,
+                version: version
+            }),
+            success: function(response) {
+                hideLoader();
+                if (response.success) {
+                    showAlert(`Rolled back to version ${version}`, 'success');
+                    loadVersions();
+                } else {
+                    showAlert(response.error || 'Rollback failed', 'danger');
+                }
+            },
+            error: function() {
+                hideLoader();
+                showAlert('Rollback error', 'danger');
+            }
+        });
+    }
+    
+    function exportVersion(version) {
+        const projectId = $('#projectId').val();
+        window.location.href = `${API_BASE}/export-version?project_id=${projectId}&version=${version}`;
+    }
+    
+    function retrainModel() {
+        const version = $('#retrainVersion').val();
+        const fileInput = document.getElementById('retrainFile');
+        
+        if (!version) {
+            showAlert('Please select a model version', 'warning');
+            return;
+        }
+        
+        if (!fileInput.files.length) {
+            showAlert('Please select a training file', 'warning');
+            return;
+        }
+        
+        showLoader();
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('version', version);
+        formData.append('project_id', $('#projectId').val());
+        
+        $.ajax({
+            url: `${API_BASE}/retrain`,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                hideLoader();
+                if (response.success) {
+                    showAlert(`Model retrained! New version: ${response.new_version}`, 'success');
+                    loadVersions();
+                } else {
+                    showAlert(response.error || 'Retrain failed', 'danger');
+                }
+            },
+            error: function(xhr) {
+                hideLoader();
+                showAlert('Retrain error: ' + (xhr.responseJSON?.error || 'Unknown'), 'danger');
+            }
+        });
+    }
+</script>
+{% endblock %}

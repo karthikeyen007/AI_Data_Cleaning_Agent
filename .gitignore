@@ -1,0 +1,58 @@
+# ===== Environment =====
+.env
+.env.*
+!.env.example
+
+# ===== Python =====
+venv/
+env/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ===== IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== Generated Data =====
+datasets/cleaned/
+models/
+*.db
+*.sqlite3
+
+# ===== Logs =====
+*.log
+logs/
+
+# ===== Test/Debug files =====
+debug_*.py
+quick_test.py
+e2e_test.py
+demo.py
+verify_platform.py
+setup_test_db.py
+STABILIZATION_REPORT.md
+
+# ===== Jupyter =====
+.ipynb_checkpoints/
+*.ipynb
+
+# ===== Byte-compiled =====
+*.pyc
+*.pyo

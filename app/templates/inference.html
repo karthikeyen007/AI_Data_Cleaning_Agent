@@ -1,0 +1,434 @@
+{% extends "base.html" %}
+
+{% block title %}Inference - Make Predictions{% endblock %}
+
+{% block extra_css %}
+<style>
+    .model-info-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 25px;
+    }
+    .model-info-card h4 {
+        margin-bottom: 20px;
+    }
+    .model-stat {
+        text-align: center;
+        padding: 10px;
+    }
+    .model-stat h3 {
+        font-size: 1.5rem;
+        margin: 0;
+    }
+    .model-stat p {
+        margin: 5px 0 0;
+        opacity: 0.9;
+        font-size: 0.85rem;
+    }
+    
+    .prediction-result {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 30px;
+        text-align: center;
+    }
+    .prediction-result h2 {
+        font-size: 3rem;
+        margin-bottom: 10px;
+    }
+    
+    .probability-bar {
+        height: 30px;
+        border-radius: 5px;
+        margin-bottom: 5px;
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+        color: white;
+        font-weight: bold;
+    }
+    
+    .feature-input {
+        margin-bottom: 15px;
+    }
+    .feature-input label {
+        font-weight: 500;
+        margin-bottom: 5px;
+    }
+    
+    .no-model-warning {
+        background: #fff3cd;
+        border: 2px solid #ffc107;
+        border-radius: 10px;
+        padding: 30px;
+        text-align: center;
+    }
+    .no-model-warning i {
+        font-size: 3rem;
+        color: #ffc107;
+        margin-bottom: 15px;
+    }
+    
+    .batch-results {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-magic"></i> Model Inference</h2>
+        <p class="text-muted">Make predictions using your trained model</p>
+    </div>
+</div>
+
+<!-- Model Info Section -->
+<div id="modelInfoSection">
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2">Checking for trained model...</p>
+    </div>
+</div>
+
+<!-- No Model Warning -->
+<div id="noModelWarning" style="display: none;">
+    <div class="no-model-warning">
+        <i class="fas fa-exclamation-triangle"></i>
+        <h4>No Trained Model Found</h4>
+        <p>You need to train a model before making predictions.</p>
+        <a href="/ml_dashboard" class="btn btn-primary btn-lg">
+            <i class="fas fa-brain"></i> Go to ML Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Inference UI (shown when model exists) -->
+<div id="inferenceUI" style="display: none;">
+    <!-- Model Info Card -->
+    <div class="model-info-card" id="modelCard">
+        <h4><i class="fas fa-robot"></i> Active Model</h4>
+        <div class="row">
+            <div class="col-md-3">
+                <div class="model-stat">
+                    <h3 id="modelAlgorithm">-</h3>
+                    <p>Algorithm</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="model-stat">
+                    <h3 id="modelScore">-</h3>
+                    <p>CV Score</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="model-stat">
+                    <h3 id="modelType">-</h3>
+                    <p>Problem Type</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="model-stat">
+                    <h3 id="modelFeatures">-</h3>
+                    <p>Features</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Single Prediction -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-user"></i> Single Prediction
+                </div>
+                <div class="card-body">
+                    <form id="singlePredictForm">
+                        <div id="featureInputs">
+                            <!-- Feature inputs will be dynamically generated -->
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-lg w-100">
+                            <i class="fas fa-lightning-bolt"></i> Predict
+                        </button>
+                    </form>
+                    
+                    <!-- Prediction Result -->
+                    <div id="singlePredictionResult" class="mt-4" style="display: none;">
+                        <div class="prediction-result">
+                            <p class="mb-1">Prediction</p>
+                            <h2 id="predictionValue">-</h2>
+                        </div>
+                        <div id="probabilitiesSection" class="mt-3" style="display: none;">
+                            <h6>Class Probabilities</h6>
+                            <div id="probabilitiesBars"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Batch Prediction -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="fas fa-table"></i> Batch Prediction
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <label class="form-label">Upload CSV file for batch predictions</label>
+                        <input type="file" class="form-control" id="batchFile" accept=".csv">
+                        <small class="text-muted">File should contain columns matching the training features</small>
+                    </div>
+                    <button class="btn btn-success btn-lg w-100" onclick="batchPredict()">
+                        <i class="fas fa-file-csv"></i> Run Batch Prediction
+                    </button>
+                    
+                    <!-- Batch Results -->
+                    <div id="batchResults" class="mt-4" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0"><i class="fas fa-check-circle text-success"></i> Results</h6>
+                            <button class="btn btn-sm btn-outline-primary" onclick="downloadBatchResults()">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
+                        <div class="alert alert-success">
+                            <strong id="batchCount">0</strong> predictions made
+                        </div>
+                        <div class="table-responsive batch-results">
+                            <table class="table table-sm table-striped" id="batchResultsTable">
+                                <thead></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const API_BASE = '/api/ml';
+    let sessionId = localStorage.getItem('ml_session_id') || 'default';
+    let modelInfo = null;
+    let batchResultsData = null;
+    
+    $(document).ready(function() {
+        loadModelInfo();
+    });
+    
+    function loadModelInfo() {
+        $.get(`${API_BASE}/model-info?session_id=${sessionId}`, function(data) {
+            $('#modelInfoSection').hide();
+            
+            if (data.success && data.model) {
+                modelInfo = data.model;
+                displayModelInfo(data.model);
+                generateFeatureInputs(data.model.features);
+                $('#inferenceUI').show();
+            } else {
+                $('#noModelWarning').show();
+            }
+        }).fail(function() {
+            $('#modelInfoSection').hide();
+            $('#noModelWarning').show();
+        });
+    }
+    
+    function displayModelInfo(model) {
+        $('#modelAlgorithm').text(model.algorithm || 'Unknown');
+        $('#modelScore').text(model.cv_mean ? model.cv_mean.toFixed(4) : '-');
+        $('#modelType').text((model.problem_type || 'unknown').toUpperCase());
+        $('#modelFeatures').text(model.features ? model.features.length : '-');
+    }
+    
+    function generateFeatureInputs(features) {
+        const container = $('#featureInputs');
+        container.empty();
+        
+        if (!features || features.length === 0) {
+            container.html('<div class="alert alert-warning">No feature information available</div>');
+            return;
+        }
+        
+        features.forEach(feature => {
+            container.append(`
+                <div class="feature-input">
+                    <label class="form-label">${feature}</label>
+                    <input type="text" class="form-control" name="${feature}" placeholder="Enter value...">
+                </div>
+            `);
+        });
+    }
+    
+    $('#singlePredictForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        // Gather input data
+        const inputData = {};
+        $(this).find('input').each(function() {
+            const name = $(this).attr('name');
+            const value = $(this).val();
+            // Try to parse as number
+            const numVal = parseFloat(value);
+            inputData[name] = isNaN(numVal) ? value : numVal;
+        });
+        
+        // Make prediction
+        showLoader('Making prediction...');
+        
+        $.ajax({
+            url: `${API_BASE}/predict`,
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                session_id: sessionId,
+                input_data: inputData
+            }),
+            success: function(response) {
+                hideLoader();
+                if (response.success) {
+                    displayPrediction(response);
+                } else {
+                    showAlert('Prediction error: ' + response.error, 'danger');
+                }
+            },
+            error: function(xhr) {
+                hideLoader();
+                showAlert('Prediction failed: ' + (xhr.responseJSON?.error || 'Unknown error'), 'danger');
+            }
+        });
+    });
+    
+    function displayPrediction(result) {
+        $('#predictionValue').text(result.prediction);
+        $('#singlePredictionResult').show();
+        
+        // Show probabilities if available
+        if (result.probabilities && Object.keys(result.probabilities).length > 0) {
+            const container = $('#probabilitiesBars');
+            container.empty();
+            
+            // Sort by probability
+            const sorted = Object.entries(result.probabilities).sort((a, b) => b[1] - a[1]);
+            
+            const colors = ['#28a745', '#17a2b8', '#ffc107', '#dc3545', '#6f42c1'];
+            sorted.forEach(([cls, prob], i) => {
+                const pct = (prob * 100).toFixed(1);
+                const color = colors[i % colors.length];
+                container.append(`
+                    <div class="probability-bar" style="width: ${pct}%; background: ${color}; min-width: 60px;">
+                        ${cls}: ${pct}%
+                    </div>
+                `);
+            });
+            
+            $('#probabilitiesSection').show();
+        } else {
+            $('#probabilitiesSection').hide();
+        }
+    }
+    
+    function batchPredict() {
+        const fileInput = document.getElementById('batchFile');
+        if (!fileInput.files.length) {
+            showAlert('Please select a CSV file', 'warning');
+            return;
+        }
+        
+        showLoader('Running batch predictions...');
+        
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('session_id', sessionId);
+        
+        $.ajax({
+            url: `${API_BASE}/batch-predict`,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                hideLoader();
+                if (response.success) {
+                    displayBatchResults(response);
+                    showAlert(`${response.count} predictions made!`, 'success');
+                } else {
+                    showAlert('Batch prediction error: ' + response.error, 'danger');
+                }
+            },
+            error: function(xhr) {
+                hideLoader();
+                showAlert('Batch prediction failed', 'danger');
+            }
+        });
+    }
+    
+    function displayBatchResults(response) {
+        batchResultsData = response.results;
+        
+        $('#batchCount').text(response.count);
+        
+        // Build table
+        if (response.results && response.results.length > 0) {
+            const thead = $('#batchResultsTable thead');
+            const tbody = $('#batchResultsTable tbody');
+            thead.empty();
+            tbody.empty();
+            
+            const cols = Object.keys(response.results[0]);
+            thead.append('<tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr>');
+            
+            response.results.slice(0, 100).forEach(row => {
+                tbody.append('<tr>' + cols.map(c => {
+                    const val = row[c];
+                    const isPredict = c === 'prediction';
+                    return `<td ${isPredict ? 'class="fw-bold text-success"' : ''}>${val !== null ? val : '-'}</td>`;
+                }).join('') + '</tr>');
+            });
+            
+            if (response.results.length > 100) {
+                tbody.append(`<tr><td colspan="${cols.length}" class="text-center text-muted">... and ${response.results.length - 100} more rows</td></tr>`);
+            }
+        }
+        
+        $('#batchResults').show();
+    }
+    
+    function downloadBatchResults() {
+        if (!batchResultsData) return;
+        
+        // Convert to CSV
+        const cols = Object.keys(batchResultsData[0]);
+        let csv = cols.join(',') + '\n';
+        batchResultsData.forEach(row => {
+            csv += cols.map(c => {
+                const val = row[c];
+                if (typeof val === 'string' && val.includes(',')) {
+                    return `"${val}"`;
+                }
+                return val;
+            }).join(',') + '\n';
+        });
+        
+        // Download
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'predictions.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Home - AI Data Cleaning System{% endblock %}
+
+{% block content %}
+<div class="text-center text-white mb-5">
+    <h1 class="display-3 fw-bold"><i class="fas fa-broom"></i> AI Data Cleaning System</h1>
+    <p class="lead">Clean your data effortlessly using AI-powered processing with Euri API</p>
+    <p class="text-white-50">Powered by 27+ AI Models | Flask + FastAPI Architecture</p>
+</div>
+
+<div class="row mt-5">
+    <!-- CSV/Excel Upload -->
+    <div class="col-md-3 mb-4">
+        <div class="card data-source-card" onclick="window.location.href='/upload'">
+            <div class="card-body text-center">
+                <div class="data-source-icon text-primary">
+                    <i class="fas fa-file-upload"></i>
+                </div>
+                <h3 class="card-title fw-bold">Upload File</h3>
+                <p class="card-text">
+                    Upload CSV or Excel files for intelligent data cleaning
+                </p>
+                <div class="mt-3">
+                    <span class="badge bg-primary">CSV</span>
+                    <span class="badge bg-primary">XLSX</span>
+                    <span class="badge bg-primary">XLS</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Database Query -->
+    <div class="col-md-3 mb-4">
+        <div class="card data-source-card" onclick="window.location.href='/database'">
+            <div class="card-body text-center">
+                <div class="data-source-icon text-success">
+                    <i class="fas fa-database"></i>
+                </div>
+                <h3 class="card-title fw-bold">Database Query</h3>
+                <p class="card-text">
+                    Connect to databases and clean query results with AI
+                </p>
+                <div class="mt-3">
+                    <span class="badge bg-success">PostgreSQL</span>
+                    <span class="badge bg-success">MySQL</span>
+                    <span class="badge bg-success">SQLite</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Data -->
+    <div class="col-md-3 mb-4">
+        <div class="card data-source-card" onclick="window.location.href='/api_data'">
+            <div class="card-body text-center">
+                <div class="data-source-icon text-info">
+                    <i class="fas fa-cloud-download-alt"></i>
+                </div>
+                <h3 class="card-title fw-bold">API Data</h3>
+                <p class="card-text">
+                    Fetch data from REST APIs and clean it automatically
+                </p>
+                <div class="mt-3">
+                    <span class="badge bg-info">REST API</span>
+                    <span class="badge bg-info">JSON</span>
+                    <span class="badge bg-info">Web Services</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ML Dashboard -->
+    <div class="col-md-3 mb-4">
+        <div class="card data-source-card" onclick="window.location.href='/ml_dashboard'" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div class="card-body text-center text-white">
+                <div class="data-source-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <h3 class="card-title fw-bold">AutoML</h3>
+                <p class="card-text">
+                    Train ML models with automated algorithm selection & tuning
+                </p>
+                <div class="mt-3">
+                    <span class="badge bg-light text-dark">XGBoost</span>
+                    <span class="badge bg-light text-dark">RandomForest</span>
+                    <span class="badge bg-light text-dark">SVM</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- AutoML Features Section -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+            <div class="card-header text-white" style="background: transparent; border: none;">
+                <i class="fas fa-rocket"></i> AutoML Platform Features
+            </div>
+            <div class="card-body">
+                <div class="row text-white">
+                    <div class="col-md-2 mb-3 text-center">
+                        <i class="fas fa-brain fa-2x mb-2"></i>
+                        <h6>9+ Algorithms</h6>
+                    </div>
+                    <div class="col-md-2 mb-3 text-center">
+                        <i class="fas fa-sliders-h fa-2x mb-2"></i>
+                        <h6>Auto Tuning</h6>
+                    </div>
+                    <div class="col-md-2 mb-3 text-center">
+                        <i class="fas fa-trophy fa-2x mb-2"></i>
+                        <h6>Leaderboard</h6>
+                    </div>
+                    <div class="col-md-2 mb-3 text-center">
+                        <i class="fas fa-history fa-2x mb-2"></i>
+                        <h6>Versioning</h6>
+                    </div>
+                    <div class="col-md-2 mb-3 text-center">
+                        <i class="fas fa-magic fa-2x mb-2"></i>
+                        <h6>Inference</h6>
+                    </div>
+                    <div class="col-md-2 mb-3 text-center">
+                        <i class="fas fa-chart-line fa-2x mb-2"></i>
+                        <h6>Drift Detection</h6>
+                    </div>
+                </div>
+                <div class="text-center mt-3">
+                    <a href="/ml_dashboard" class="btn btn-light btn-lg">
+                        <i class="fas fa-play"></i> Start Training Models
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Features Section -->
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-star"></i> Key Features
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center">
+                            <i class="fas fa-robot fa-3x text-primary mb-3"></i>
+                            <h5>AI-Powered</h5>
+                            <p class="text-muted">Uses Euri API with 27+ AI models for intelligent cleaning</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center">
+                            <i class="fas fa-magic fa-3x text-success mb-3"></i>
+                            <h5>Auto Detection</h5>
+                            <p class="text-muted">Automatically detects and handles missing values</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center">
+                            <i class="fas fa-chart-line fa-3x text-info mb-3"></i>
+                            <h5>Quality Analysis</h5>
+                            <p class="text-muted">Provides data quality insights and recommendations</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center">
+                            <i class="fas fa-download fa-3x text-warning mb-3"></i>
+                            <h5>Easy Export</h5>
+                            <p class="text-muted">Download cleaned data in CSV format</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Technology Stack -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-code"></i> Technology Stack
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-2 mb-3">
+                        <i class="fab fa-python fa-3x text-primary"></i>
+                        <p class="mt-2"><strong>Python</strong></p>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <i class="fas fa-flask fa-3x text-success"></i>
+                        <p class="mt-2"><strong>Flask</strong></p>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <i class="fas fa-server fa-3x text-danger"></i>
+                        <p class="mt-2"><strong>FastAPI</strong></p>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <i class="fas fa-brain fa-3x text-warning"></i>
+                        <p class="mt-2"><strong>Euri API</strong></p>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <i class="fas fa-table fa-3x text-info"></i>
+                        <p class="mt-2"><strong>Pandas</strong></p>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <i class="fas fa-database fa-3x text-secondary"></i>
+                        <p class="mt-2"><strong>PostgreSQL</strong></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Start Guide -->
+<div class="row mt-4 mb-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-rocket"></i> Quick Start Guide
+            </div>
+            <div class="card-body">
+                <ol class="fs-5">
+                    <li class="mb-2"><strong>Choose a data source</strong> - Select from file upload, database, or API</li>
+                    <li class="mb-2"><strong>Provide your data</strong> - Upload file, enter query, or provide API endpoint</li>
+                    <li class="mb-2"><strong>AI processes data</strong> - Our system cleans your data automatically</li>
+                    <li class="mb-2"><strong>Review & Download</strong> - Check results and download cleaned data</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Database Query - AI Data Cleaning{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-database"></i> Database Query & Cleaning
+            </div>
+            <div class="card-body">
+                <form id="databaseForm">
+                    <div class="mb-4">
+                        <label for="dbUrl" class="form-label fs-5">Database Connection URL</label>
+                        <input type="text" class="form-control form-control-lg" id="dbUrl" 
+                               placeholder="postgresql://user:password@localhost:5432/database"
+                               value="postgresql://postgres:admin@localhost:5432/demodb"
+                               required>
+                        <div class="form-text">
+                            Examples:<br>
+                            - PostgreSQL: postgresql://user:pass@localhost:5432/dbname<br>
+                            - MySQL: mysql://user:pass@localhost:3306/dbname<br>
+                            - SQLite: sqlite:///path/to/database.db
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="sqlQuery" class="form-label fs-5">SQL Query</label>
+                        <textarea class="form-control" id="sqlQuery" rows="5" 
+                                  placeholder="SELECT * FROM your_table LIMIT 100;" required>SELECT * FROM my_table;</textarea>
+                        <div class="form-text">Enter your SQL query to fetch data</div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-magic"></i> Fetch & Clean Data
+                    </button>
+                    <a href="/" class="btn btn-secondary btn-lg ms-2">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </a>
+                </form>
+            </div>
+        </div>
+
+        <!-- Cleaned Data Results -->
+        <div id="cleanedDataSection" class="card mt-4" style="display: none;">
+            <div class="card-header">
+                <i class="fas fa-check-circle"></i> AI-Cleaned Database Data
+            </div>
+            <div class="card-body">
+                <div class="stats-card mb-3">
+                    <h3 id="totalRows">0</h3>
+                    <p>Total Rows Retrieved & Cleaned</p>
+                </div>
+                
+                <div class="mb-3">
+                    <button class="btn btn-success" onclick="downloadCleanedData()">
+                        <i class="fas fa-download"></i> Download Cleaned CSV
+                    </button>
+                </div>
+                
+                <div id="cleanedDataTable"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let cleanedDataGlobal = [];
+
+    $('#databaseForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const dbUrl = $('#dbUrl').val();
+        const query = $('#sqlQuery').val();
+        
+        if (!dbUrl || !query) {
+            showAlert('Please provide both database URL and SQL query', 'warning');
+            return;
+        }
+        
+        showLoader();
+        $('#cleanedDataSection').hide();
+        
+        $.ajax({
+            url: '/api/clean-database',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                db_url: dbUrl,
+                query: query
+            }),
+            success: function(response) {
+                hideLoader();
+                
+                if (response.success) {
+                    showAlert(response.message, 'success');
+                    
+                    // Display cleaned data
+                    cleanedDataGlobal = response.cleaned_data;
+                    $('#totalRows').text(response.total_rows);
+                    $('#cleanedDataTable').html(renderDataTable(response.cleaned_data.slice(0, 20)));
+                    $('#cleanedDataSection').show();
+                    
+                    // Scroll to results
+                    $('html, body').animate({
+                        scrollTop: $('#cleanedDataSection').offset().top - 100
+                    }, 500);
+                } else {
+                    showAlert(response.error || 'Failed to fetch or clean data', 'danger');
+                }
+            },
+            error: function(xhr) {
+                hideLoader();
+                const error = xhr.responseJSON?.error || 'An error occurred while processing database query';
+                showAlert(error, 'danger');
+            }
+        });
+    });
+
+    function downloadCleanedData() {
+        if (cleanedDataGlobal.length === 0) {
+            showAlert('No data available to download', 'warning');
+            return;
+        }
+        downloadCSV(cleanedDataGlobal, 'cleaned_database_data.csv');
+    }
+</script>
+{% endblock %}
